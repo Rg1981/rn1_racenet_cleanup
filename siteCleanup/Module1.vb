@@ -1,10 +1,15 @@
 ﻿Imports System.Data.SqlClient
-Imports Microsoft.VisualBasic
 Imports System.Net.Mail
 Imports System.Net
 Imports System.IO
 Imports System.Text
 Imports System.Text.RegularExpressions
+Imports Amazon.S3
+Imports Amazon.S3.Model
+Imports RN.HTML.Builder.Methods.HTMLBuilders
+Imports RN.HTML.Builder.Process.FormPage
+Imports RN.HTML.Builder.Process.FormTabsGenerator
+Imports Nito.AsyncEx
 
 Module Module1
 
@@ -57,184 +62,184 @@ Module Module1
                 formTablesDelete.CommandTimeout = 150
                 RacenetSql.disposeCommand(formTablesDelete)
 
-                Dim formPath As String = rootPath + "/breeding/includes/homepage/form.txt"
-                Dim formHeadPath As String = rootPath + "/breeding/includes/homepage/formtabs.txt"
-                Dim formFootPath As String = rootPath + "/breeding/includes/homepage/formbottom.txt"
-                Dim formFootText As String = File.ReadAllText(formFootPath)
-                Dim formText As StreamWriter = File.CreateText(formPath)
-                Dim formHeadText As StreamWriter = File.CreateText(formHeadPath)
+                'Dim formPath As String = rootPath + "/breeding/includes/homepage/form.txt"
+                'Dim formHeadPath As String = rootPath + "/breeding/includes/homepage/formtabs.txt"
+                'Dim formFootPath As String = rootPath + "/breeding/includes/homepage/formbottom.txt"
+                'Dim formFootText As String = File.ReadAllText(formFootPath)
+                'Dim formText As StreamWriter = File.CreateText(formPath)
+                'Dim formHeadText As StreamWriter = File.CreateText(formHeadPath)
 
-                Dim formOnlineCMD As SqlCommand = RacenetSql.buildCommand("p_RawFormOnline", conn)
-                Dim formOnlineReader As SqlDataReader = formOnlineCMD.ExecuteReader
-                If formOnlineReader.HasRows Then
-                    Dim tabCount As Integer = 1
-                    Dim RacenetClub As String = ""
-                    Dim currentTextdate As String = ""
-                    Dim currentTabIndex As Integer = 0
-                    Dim racenetURL As String = ""
-                    Dim meetingDateDif As Integer = 0
-                    While formOnlineReader.Read
-                        RacenetClub = RacenetSql.dbIsNull(formOnlineReader, "Racenet")
-                        If RacenetClub = "Yes" Then
-                            racenetURL = "rn"
-                        Else
-                            racenetURL = "nr"
-                        End If
-                        If meetingDateDif > 6 Then
-                            currentTextdate = formOnlineReader("textdate")
-                        End If
-                        If Not currentTextdate = formOnlineReader("textdate") Then
-                            currentTextdate = formOnlineReader("textdate")
-                            meetingDateDif = (Convert.ToDateTime(formOnlineReader("mdate")) - Convert.ToDateTime(Now.ToString("yyyy-MM-dd"))).TotalDays
-                            'Console.WriteLine(meetingDateDif.ToString)
-                            If meetingDateDif = 0 Then
-                                formHeadText.WriteLine("<li><a href=""#tabs-" + tabCount.ToString + """>Today</a></li>")
-                            End If
-                            If meetingDateDif = 1 Then
-                                formHeadText.WriteLine("<li><a href=""#tabs-" + tabCount.ToString + """>Tomorrow</a></li>")
-                            End If
-                            If meetingDateDif > 1 And meetingDateDif < 7 Then
-                                formHeadText.WriteLine("<li><a href=""#tabs-" + tabCount.ToString + """>" + Convert.ToDateTime(formOnlineReader("mdate")).ToString("dddd") + "</a></li>")
-                            End If
-                            If meetingDateDif > 6 Then
-                                formHeadText.WriteLine("<li class=""liFuture""><a href=""#tabs-" + tabCount.ToString + """ class=""linkFuture"">Future</a></li>")
-                            End If
-                            tabCount += 1
-                        End If
-                        If Not currentTabIndex = tabCount - 1 Then
-                            currentTabIndex = tabCount - 1
-                            If currentTabIndex = 1 Then
-                                formText.WriteLine("<div id=""tabs-" + currentTabIndex.ToString + """>")
-                                formText.WriteLine("<table border=""0"" class=""homePageTabs"" cellpadding=""0"" cellspacing=""0"">")
-                                formText.WriteLine("<tr>")
-                                formText.WriteLine("<td class=""tdHead tdMeeting"">Track</td>")
-                                formText.WriteLine("<td class=""tdHead tdTrack"">Conditions</td>")
-                                formText.WriteLine("<td class=""tdHead"">Indexes</td>")
-                                formText.WriteLine("<td class=""tdHead""></td>")
-                                formText.WriteLine("<td class=""tdHead""></td>")
-                                formText.WriteLine("<td class=""tdHead""></td>")
-                                formText.WriteLine("</tr>")
-                            Else
-                                formText.WriteLine(formFootText)
-                                formText.WriteLine("</table>")
-                                formText.WriteLine("</div>")
-                                formText.WriteLine("<div id=""tabs-" + currentTabIndex.ToString + """>")
-                                formText.WriteLine("<table border=""0"" class=""homePageTabs"" cellpadding=""0"" cellspacing=""0"">")
-                                formText.WriteLine("<tr>")
-                                formText.WriteLine("<td class=""tdHead tdMeeting"">Track</td>")
-                                formText.WriteLine("<td class=""tdHead tdTrack"">Conditions</td>")
-                                formText.WriteLine("<td class=""tdHead"">Indexes</td>")
-                                formText.WriteLine("<td class=""tdHead""></td>")
-                                formText.WriteLine("<td class=""tdHead""></td>")
-                                formText.WriteLine("<td class=""tdHead""></td>")
-                                formText.WriteLine("</tr>")
-                            End If
-                        End If
-                        Dim racebookLink As String = ""
-                        If File.Exists(rootPath + "/racebooks/" + formOnlineReader("trackcode").ToString.Replace(" ", "") + "_" + formOnlineReader("textdate") + ".pdf") Then
-                            racebookLink = "<a href=""/racebooks/" + formOnlineReader("trackcode").ToString.Replace(" ", "") + "_" + formOnlineReader("textdate") + ".pdf"" class=""linkBorderLeft link_red_under"">Racebook</a>"
-                        End If
-                        Dim formStatus As String = formOnlineReader("FormStatus")
-                        Dim formStatusText As String = ""
-                        If formStatus = "F" Then
-                            formStatusText = "Fields"
-                        End If
-                        If formStatus = "W" Then
-                            formStatusText = "Weights"
-                        End If
-                        If formStatus = "N" Then
-                            formStatusText = "Nominations"
-                        End If
-                        If formStatus = "EN" Then
-                            formStatusText = "Nominations"
-                        End If
-                        If formStatus = "EW" Then
-                            formStatusText = "Weights"
-                        End If
-                        Dim trackCondition As String = RacenetSql.dbIsNull(formOnlineReader, "condition")
+                'Dim formOnlineCMD As SqlCommand = RacenetSql.buildCommand("p_RawFormOnline", conn)
+                'Dim formOnlineReader As SqlDataReader = formOnlineCMD.ExecuteReader
+                'If formOnlineReader.HasRows Then
+                '    Dim tabCount As Integer = 1
+                '    Dim RacenetClub As String = ""
+                '    Dim currentTextdate As String = ""
+                '    Dim currentTabIndex As Integer = 0
+                '    Dim racenetURL As String = ""
+                '    Dim meetingDateDif As Integer = 0
+                '    While formOnlineReader.Read
+                '        RacenetClub = RacenetSql.dbIsNull(formOnlineReader, "Racenet")
+                '        If RacenetClub = "Yes" Then
+                '            racenetURL = "rn"
+                '        Else
+                '            racenetURL = "nr"
+                '        End If
+                '        If meetingDateDif > 6 Then
+                '            currentTextdate = formOnlineReader("textdate")
+                '        End If
+                '        If Not currentTextdate = formOnlineReader("textdate") Then
+                '            currentTextdate = formOnlineReader("textdate")
+                '            meetingDateDif = (Convert.ToDateTime(formOnlineReader("mdate")) - Convert.ToDateTime(Now.ToString("yyyy-MM-dd"))).TotalDays
+                '            'Console.WriteLine(meetingDateDif.ToString)
+                '            If meetingDateDif = 0 Then
+                '                formHeadText.WriteLine("<li><a href=""#tabs-" + tabCount.ToString + """>Today</a></li>")
+                '            End If
+                '            If meetingDateDif = 1 Then
+                '                formHeadText.WriteLine("<li><a href=""#tabs-" + tabCount.ToString + """>Tomorrow</a></li>")
+                '            End If
+                '            If meetingDateDif > 1 And meetingDateDif < 7 Then
+                '                formHeadText.WriteLine("<li><a href=""#tabs-" + tabCount.ToString + """>" + Convert.ToDateTime(formOnlineReader("mdate")).ToString("dddd") + "</a></li>")
+                '            End If
+                '            If meetingDateDif > 6 Then
+                '                formHeadText.WriteLine("<li class=""liFuture""><a href=""#tabs-" + tabCount.ToString + """ class=""linkFuture"">Future</a></li>")
+                '            End If
+                '            tabCount += 1
+                '        End If
+                '        If Not currentTabIndex = tabCount - 1 Then
+                '            currentTabIndex = tabCount - 1
+                '            If currentTabIndex = 1 Then
+                '                formText.WriteLine("<div id=""tabs-" + currentTabIndex.ToString + """>")
+                '                formText.WriteLine("<table border=""0"" class=""homePageTabs"" cellpadding=""0"" cellspacing=""0"">")
+                '                formText.WriteLine("<tr>")
+                '                formText.WriteLine("<td class=""tdHead tdMeeting"">Track</td>")
+                '                formText.WriteLine("<td class=""tdHead tdTrack"">Conditions</td>")
+                '                formText.WriteLine("<td class=""tdHead"">Indexes</td>")
+                '                formText.WriteLine("<td class=""tdHead""></td>")
+                '                formText.WriteLine("<td class=""tdHead""></td>")
+                '                formText.WriteLine("<td class=""tdHead""></td>")
+                '                formText.WriteLine("</tr>")
+                '            Else
+                '                formText.WriteLine(formFootText)
+                '                formText.WriteLine("</table>")
+                '                formText.WriteLine("</div>")
+                '                formText.WriteLine("<div id=""tabs-" + currentTabIndex.ToString + """>")
+                '                formText.WriteLine("<table border=""0"" class=""homePageTabs"" cellpadding=""0"" cellspacing=""0"">")
+                '                formText.WriteLine("<tr>")
+                '                formText.WriteLine("<td class=""tdHead tdMeeting"">Track</td>")
+                '                formText.WriteLine("<td class=""tdHead tdTrack"">Conditions</td>")
+                '                formText.WriteLine("<td class=""tdHead"">Indexes</td>")
+                '                formText.WriteLine("<td class=""tdHead""></td>")
+                '                formText.WriteLine("<td class=""tdHead""></td>")
+                '                formText.WriteLine("<td class=""tdHead""></td>")
+                '                formText.WriteLine("</tr>")
+                '            End If
+                '        End If
+                '        Dim racebookLink As String = ""
+                '        If File.Exists(rootPath + "/racebooks/" + formOnlineReader("trackcode").ToString.Replace(" ", "") + "_" + formOnlineReader("textdate") + ".pdf") Then
+                '            racebookLink = "<a href=""/racebooks/" + formOnlineReader("trackcode").ToString.Replace(" ", "") + "_" + formOnlineReader("textdate") + ".pdf"" class=""linkBorderLeft link_red_under"">Racebook</a>"
+                '        End If
+                '        Dim formStatus As String = formOnlineReader("FormStatus")
+                '        Dim formStatusText As String = ""
+                '        If formStatus = "F" Then
+                '            formStatusText = "Fields"
+                '        End If
+                '        If formStatus = "W" Then
+                '            formStatusText = "Weights"
+                '        End If
+                '        If formStatus = "N" Then
+                '            formStatusText = "Nominations"
+                '        End If
+                '        If formStatus = "EN" Then
+                '            formStatusText = "Nominations"
+                '        End If
+                '        If formStatus = "EW" Then
+                '            formStatusText = "Weights"
+                '        End If
+                '        Dim trackCondition As String = RacenetSql.dbIsNull(formOnlineReader, "condition")
 
-                        Dim showHover As Boolean = False
-                        If trackCondition.Contains("grade") Then
-                            showHover = True
-                        End If
-                        Dim postponed As Boolean = False
-                        If trackCondition.Contains("Postponed") Then
-                            postponed = True
-                        End If
-                        If trackCondition.Contains("Update") Then
-                            trackCondition = (Left(trackCondition, trackCondition.IndexOf("Update") - 1))
-                        End If
-                        If trackCondition.Contains("Finalised") Then
-                            trackCondition = (Left(trackCondition, trackCondition.IndexOf("Finalised") - 1))
-                        End If
-                        If trackCondition.Contains("Official") Then
-                            trackCondition = (Left(trackCondition, trackCondition.IndexOf("Official") - 1))
-                        End If
-                        If trackCondition.Contains("Pen") Then
-                            trackCondition = (Left(trackCondition, trackCondition.IndexOf("Pen") - 1))
-                        End If
-                        If postponed Then
-                            trackCondition = "Postponed"
-                        End If
-                        Dim conditionHover As String = ""
-                        If trackCondition.Length > 0 Then
-                            trackCondition = trackCondition.Replace("GOOD", "Good ")
-                            trackCondition = trackCondition.Replace("SLOW", "Slow ")
-                            trackCondition = trackCondition.Replace("DEAD", "Dead ")
-                            trackCondition = trackCondition.Replace("FAST", "Fast ")
-                            trackCondition = trackCondition.Replace("HEAVY", "Heavy ")
-                            trackCondition = trackCondition.Replace("FIRM", "Firm ")
-                            trackCondition = trackCondition.Replace("SOFT", "Soft ")
+                '        Dim showHover As Boolean = False
+                '        If trackCondition.Contains("grade") Then
+                '            showHover = True
+                '        End If
+                '        Dim postponed As Boolean = False
+                '        If trackCondition.Contains("Postponed") Then
+                '            postponed = True
+                '        End If
+                '        If trackCondition.Contains("Update") Then
+                '            trackCondition = (Left(trackCondition, trackCondition.IndexOf("Update") - 1))
+                '        End If
+                '        If trackCondition.Contains("Finalised") Then
+                '            trackCondition = (Left(trackCondition, trackCondition.IndexOf("Finalised") - 1))
+                '        End If
+                '        If trackCondition.Contains("Official") Then
+                '            trackCondition = (Left(trackCondition, trackCondition.IndexOf("Official") - 1))
+                '        End If
+                '        If trackCondition.Contains("Pen") Then
+                '            trackCondition = (Left(trackCondition, trackCondition.IndexOf("Pen") - 1))
+                '        End If
+                '        If postponed Then
+                '            trackCondition = "Postponed"
+                '        End If
+                '        Dim conditionHover As String = ""
+                '        If trackCondition.Length > 0 Then
+                '            trackCondition = trackCondition.Replace("GOOD", "Good ")
+                '            trackCondition = trackCondition.Replace("SLOW", "Slow ")
+                '            trackCondition = trackCondition.Replace("DEAD", "Dead ")
+                '            trackCondition = trackCondition.Replace("FAST", "Fast ")
+                '            trackCondition = trackCondition.Replace("HEAVY", "Heavy ")
+                '            trackCondition = trackCondition.Replace("FIRM", "Firm ")
+                '            trackCondition = trackCondition.Replace("SOFT", "Soft ")
 
-                            Dim trackConRegex As Regex = New Regex("(Slow|Fast|Good|Dead|Heavy|Soft|Firm)(\s)*[0-9]+")
-                            Dim trackConditionStart As String = trackConRegex.Match(trackCondition).Value
-                            trackConRegex = New Regex("[0-9]+")
-                            Dim trackConditionGrading As String = trackConRegex.Match(trackConditionStart).Value
+                '            Dim trackConRegex As Regex = New Regex("(Slow|Fast|Good|Dead|Heavy|Soft|Firm)(\s)*[0-9]+")
+                '            Dim trackConditionStart As String = trackConRegex.Match(trackCondition).Value
+                '            trackConRegex = New Regex("[0-9]+")
+                '            Dim trackConditionGrading As String = trackConRegex.Match(trackConditionStart).Value
 
-                            Dim locationIndex As Integer = trackConditionStart.IndexOf(trackConditionGrading)
-                            If locationIndex > 0 Then
-                                If Not trackConditionStart.Chars(locationIndex - 1) = " " Then
-                                    trackCondition = trackConditionStart.Substring(0, locationIndex).Trim + " " + trackConditionStart.Substring(locationIndex)
-                                End If
-                            End If
+                '            Dim locationIndex As Integer = trackConditionStart.IndexOf(trackConditionGrading)
+                '            If locationIndex > 0 Then
+                '                If Not trackConditionStart.Chars(locationIndex - 1) = " " Then
+                '                    trackCondition = trackConditionStart.Substring(0, locationIndex).Trim + " " + trackConditionStart.Substring(locationIndex)
+                '                End If
+                '            End If
 
-                            If showHover Then
-                                conditionHover = "<span class='info_icon' title='" + formOnlineReader("Condition") + "'>i</span>"
-                            End If
-                        Else
-                            trackCondition = "TBA"
-                            conditionHover = ""
-                        End If
-                        Dim trackState As String = formOnlineReader("state")
-                        If trackState = "hk" Then trackState = "hong-kong"
-                        If trackState = "nz" Then trackState = "new-zealand"
-                        If trackState = "sg" Then trackState = "singapore"
-                        Dim trackname As String = formOnlineReader("displayname").ToString.ToLower.Replace(" ", "-")
-                        Dim meetingDate As String = Convert.ToDateTime(formOnlineReader("mdate")).ToString("yyyy-MM-dd")
-                        formText.WriteLine("<td class=""tdMeeting""><a class=""link_red_under"" href=""/tracks/" + trackState + "/" + trackname + "/"">" + formOnlineReader("DisplayName") + "</a></td>")
-                        formText.WriteLine("<td class=""tdTrack SmallForm""><span class=""Heavy"" style='float: left'>" + trackCondition + "</span>" + conditionHover + "</td>")
-                        formText.WriteLine("<td class=""tdTrack SmallForm""><a class='indexData' href='/form/gear-changes_new.asp?venue=" + formOnlineReader("DisplayName") + "&mdate=" + meetingDate + "&textdate=" + formOnlineReader("Textdate") + "&trackcode=" + formOnlineReader("Trackcode") + "&tfolder=" + formOnlineReader("Foldername") + "&fn=" + formOnlineReader("Foldername") + "'>G</a><a class='indexData' href='/form/alpha_new.asp?venue=" + formOnlineReader("DisplayName") + "&mdate=" + meetingDate + "&textdate=" + formOnlineReader("Textdate") + "&trackcode=" + formOnlineReader("Trackcode") + "&tfolder=" + formOnlineReader("FolderName") + "&fn=" + formOnlineReader("FolderName") + "'>H</a><a class='indexData' href='/form/jockey-sort_new.asp?venue=" + formOnlineReader("DisplayName") + "&mdate=" + meetingDate + "&textdate=" + formOnlineReader("Textdate") + "&trackcode=" + formOnlineReader("Trackcode") + "&tfolder=" + formOnlineReader("FolderName") + "&fn=" + formOnlineReader("FolderName") + "'>J</a><a class='indexData' href='/form/trainer-sort_new.asp?venue=" + formOnlineReader("DisplayName") + "&mdate=" + meetingDate + "&textdate=" + formOnlineReader("Textdate") + "&trackcode=" + formOnlineReader("Trackcode") + "&tfolder=" + formOnlineReader("FolderName") + "&fn=" + formOnlineReader("FolderName") + "'>T</a></td>")
-                        formText.WriteLine("<td class=""tdField right""><a class=""linkBorderLeft link_red_under"" href=""/" + LCase(formOnlineReader("Foldername")) + "/race-fields/" + Replace(formOnlineReader("TrackCode"), " ", "-") + "/" + formOnlineReader("Textdate") + "/" + racenetURL + """>" + formStatusText + "</a></td>")
-                        formText.WriteLine("<td class=""tdForm right""><a class=""linkBorderLeft link_red_under"" href=""/" + LCase(formOnlineReader("Foldername")) + "/race-form/" + Replace(formOnlineReader("TrackCode"), " ", "-") + "/" + formOnlineReader("Textdate") + """>Form</a></td>")
-                        formText.WriteLine("<td class=""tdTips right""><a class=""linkBorderLeft link_red_under"" href=""/horse-racing-results/" + formOnlineReader("ResultsName") + "/" + meetingDate + """>Results</a></td>")
-                        formText.WriteLine("<td class=""tdRacebooks right"">" + racebookLink + "</td>")
-                        formText.WriteLine("</tr>")
+                '            If showHover Then
+                '                conditionHover = "<span class='info_icon' title='" + formOnlineReader("Condition") + "'>i</span>"
+                '            End If
+                '        Else
+                '            trackCondition = "TBA"
+                '            conditionHover = ""
+                '        End If
+                '        Dim trackState As String = formOnlineReader("state")
+                '        If trackState = "hk" Then trackState = "hong-kong"
+                '        If trackState = "nz" Then trackState = "new-zealand"
+                '        If trackState = "sg" Then trackState = "singapore"
+                '        Dim trackname As String = formOnlineReader("displayname").ToString.ToLower.Replace(" ", "-")
+                '        Dim meetingDate As String = Convert.ToDateTime(formOnlineReader("mdate")).ToString("yyyy-MM-dd")
+                '        formText.WriteLine("<td class=""tdMeeting""><a class=""link_red_under"" href=""/tracks/" + trackState + "/" + trackname + "/"">" + formOnlineReader("DisplayName") + "</a></td>")
+                '        formText.WriteLine("<td class=""tdTrack SmallForm""><span class=""Heavy"" style='float: left'>" + trackCondition + "</span>" + conditionHover + "</td>")
+                '        formText.WriteLine("<td class=""tdTrack SmallForm""><a class='indexData' href='/form/gear-changes_new.asp?venue=" + formOnlineReader("DisplayName") + "&mdate=" + meetingDate + "&textdate=" + formOnlineReader("Textdate") + "&trackcode=" + formOnlineReader("Trackcode") + "&tfolder=" + formOnlineReader("Foldername") + "&fn=" + formOnlineReader("Foldername") + "'>G</a><a class='indexData' href='/form/alpha_new.asp?venue=" + formOnlineReader("DisplayName") + "&mdate=" + meetingDate + "&textdate=" + formOnlineReader("Textdate") + "&trackcode=" + formOnlineReader("Trackcode") + "&tfolder=" + formOnlineReader("FolderName") + "&fn=" + formOnlineReader("FolderName") + "'>H</a><a class='indexData' href='/form/jockey-sort_new.asp?venue=" + formOnlineReader("DisplayName") + "&mdate=" + meetingDate + "&textdate=" + formOnlineReader("Textdate") + "&trackcode=" + formOnlineReader("Trackcode") + "&tfolder=" + formOnlineReader("FolderName") + "&fn=" + formOnlineReader("FolderName") + "'>J</a><a class='indexData' href='/form/trainer-sort_new.asp?venue=" + formOnlineReader("DisplayName") + "&mdate=" + meetingDate + "&textdate=" + formOnlineReader("Textdate") + "&trackcode=" + formOnlineReader("Trackcode") + "&tfolder=" + formOnlineReader("FolderName") + "&fn=" + formOnlineReader("FolderName") + "'>T</a></td>")
+                '        formText.WriteLine("<td class=""tdField right""><a class=""linkBorderLeft link_red_under"" href=""/" + LCase(formOnlineReader("Foldername")) + "/race-fields/" + Replace(formOnlineReader("TrackCode"), " ", "-") + "/" + formOnlineReader("Textdate") + "/" + racenetURL + """>" + formStatusText + "</a></td>")
+                '        formText.WriteLine("<td class=""tdForm right""><a class=""linkBorderLeft link_red_under"" href=""/" + LCase(formOnlineReader("Foldername")) + "/race-form/" + Replace(formOnlineReader("TrackCode"), " ", "-") + "/" + formOnlineReader("Textdate") + """>Form</a></td>")
+                '        formText.WriteLine("<td class=""tdTips right""><a class=""linkBorderLeft link_red_under"" href=""/horse-racing-results/" + formOnlineReader("ResultsName") + "/" + meetingDate + """>Results</a></td>")
+                '        formText.WriteLine("<td class=""tdRacebooks right"">" + racebookLink + "</td>")
+                '        formText.WriteLine("</tr>")
 
-                    End While
-                    formText.WriteLine(formFootText)
-                    formText.WriteLine("</table>")
-                    formText.WriteLine("</div>")
-                Else
-                    formText.WriteLine("&nbsp;")
-                End If
-                RacenetSql.closeReader(formOnlineReader)
-                RacenetSql.disposeCommand(formOnlineCMD)
-                formHeadText.Close()
-                formHeadText.Dispose()
-                formHeadText = Nothing
-                formText.Close()
-                formText.Dispose()
-                formText = Nothing
+                '    End While
+                '    formText.WriteLine(formFootText)
+                '    formText.WriteLine("</table>")
+                '    formText.WriteLine("</div>")
+                'Else
+                '    formText.WriteLine("&nbsp;")
+                'End If
+                'RacenetSql.closeReader(formOnlineReader)
+                'RacenetSql.disposeCommand(formOnlineCMD)
+                'formHeadText.Close()
+                'formHeadText.Dispose()
+                'formHeadText = Nothing
+                'formText.Close()
+                'formText.Dispose()
+                'formText = Nothing
 
                 '####################################################################################
                 'Ratings Clean Up
@@ -245,52 +250,52 @@ Module Module1
                 ratingsCleanUp.ExecuteNonQuery()
                 RacenetSql.disposeCommand(ratingsCleanUp)
 
-                Dim ratingsGetCountCMD As SqlCommand = RacenetSql.buildCommand("RA_RatingsOnlineCount", conn)
-                Dim ratingsGetCountReader As SqlDataReader = ratingsGetCountCMD.ExecuteReader
-                Dim ratingsMeetingsOnline As Integer = 0
-                If ratingsGetCountReader.HasRows Then
-                    ratingsGetCountReader.Read()
-                    ratingsMeetingsOnline = ratingsGetCountReader("RatingsMeetings")
-                End If
-                RacenetSql.closeReader(ratingsGetCountReader)
-                RacenetSql.disposeCommand(ratingsGetCountCMD)
+                'Dim ratingsGetCountCMD As SqlCommand = RacenetSql.buildCommand("RA_RatingsOnlineCount", conn)
+                'Dim ratingsGetCountReader As SqlDataReader = ratingsGetCountCMD.ExecuteReader
+                'Dim ratingsMeetingsOnline As Integer = 0
+                'If ratingsGetCountReader.HasRows Then
+                '    ratingsGetCountReader.Read()
+                '    ratingsMeetingsOnline = ratingsGetCountReader("RatingsMeetings")
+                'End If
+                'RacenetSql.closeReader(ratingsGetCountReader)
+                'RacenetSql.disposeCommand(ratingsGetCountCMD)
 
-                Dim ratingsSplit As Integer = 0
-                If ratingsMeetingsOnline > 2 Then
-                    ratingsSplit = Math.Round(ratingsMeetingsOnline / 2)
-                Else
-                    ratingsSplit = 1000
-                End If
-                Dim ratingsHomePath As String = rootPath + "/breeding/includes/homepage/ratingsmeetings.txt"
-                Dim ratingsHomeFile As StreamWriter = File.CreateText(ratingsHomePath)
-                Dim cRatingsCount As Integer = 1
-                Dim currentRatingsDate As String = ""
+                'Dim ratingsSplit As Integer = 0
+                'If ratingsMeetingsOnline > 2 Then
+                '    ratingsSplit = Math.Round(ratingsMeetingsOnline / 2)
+                'Else
+                '    ratingsSplit = 1000
+                'End If
+                'Dim ratingsHomePath As String = rootPath + "/breeding/includes/homepage/ratingsmeetings.txt"
+                'Dim ratingsHomeFile As StreamWriter = File.CreateText(ratingsHomePath)
+                'Dim cRatingsCount As Integer = 1
+                'Dim currentRatingsDate As String = ""
 
-                Dim onlineRatingsMeetingsCMD As SqlCommand = RacenetSql.buildCommand("rn_ratingsOnline", conn)
-                Dim onlineRatingsMeetingsReader As SqlDataReader = onlineRatingsMeetingsCMD.ExecuteReader
-                If onlineRatingsMeetingsReader.HasRows Then
-                    While onlineRatingsMeetingsReader.Read
-                        If cRatingsCount = ratingsSplit + 1 Then
-                            ratingsHomeFile.WriteLine("</ul>")
-                            ratingsHomeFile.WriteLine("</td>")
-                            ratingsHomeFile.WriteLine("<td valign=""top"">")
-                            ratingsHomeFile.WriteLine("<ul>")
-                        End If
-                        cRatingsCount += 1
-                        If Not currentRatingsDate = onlineRatingsMeetingsReader("RaceDate").ToString Then
-                            currentRatingsDate = onlineRatingsMeetingsReader("RaceDate").ToString
-                            ratingsHomeFile.WriteLine("<li class=""prod_list_head"">" + Convert.ToDateTime(currentRatingsDate).ToString("dddd") + " - " + Convert.ToDateTime(currentRatingsDate).ToString("d") + " " + Convert.ToDateTime(currentRatingsDate).ToString("MMMM") + "</li>")
-                        End If
-                        ratingsHomeFile.WriteLine("<li><a class=""link_white"" href=""http://www.racenet.com.au/horse-racing-tips/ratings/"">" + onlineRatingsMeetingsReader("DisplayName").ToString.ToUpper + "</a></li>")
-                    End While
-                Else
-                    ratingsHomeFile.WriteLine("")
-                End If
-                RacenetSql.closeReader(onlineRatingsMeetingsReader)
-                RacenetSql.disposeCommand(onlineRatingsMeetingsCMD)
-                ratingsHomeFile.Close()
-                ratingsHomeFile.Dispose()
-                ratingsHomeFile = Nothing
+                'Dim onlineRatingsMeetingsCMD As SqlCommand = RacenetSql.buildCommand("rn_ratingsOnline", conn)
+                'Dim onlineRatingsMeetingsReader As SqlDataReader = onlineRatingsMeetingsCMD.ExecuteReader
+                'If onlineRatingsMeetingsReader.HasRows Then
+                '    While onlineRatingsMeetingsReader.Read
+                '        If cRatingsCount = ratingsSplit + 1 Then
+                '            ratingsHomeFile.WriteLine("</ul>")
+                '            ratingsHomeFile.WriteLine("</td>")
+                '            ratingsHomeFile.WriteLine("<td valign=""top"">")
+                '            ratingsHomeFile.WriteLine("<ul>")
+                '        End If
+                '        cRatingsCount += 1
+                '        If Not currentRatingsDate = onlineRatingsMeetingsReader("RaceDate").ToString Then
+                '            currentRatingsDate = onlineRatingsMeetingsReader("RaceDate").ToString
+                '            ratingsHomeFile.WriteLine("<li class=""prod_list_head"">" + Convert.ToDateTime(currentRatingsDate).ToString("dddd") + " - " + Convert.ToDateTime(currentRatingsDate).ToString("d") + " " + Convert.ToDateTime(currentRatingsDate).ToString("MMMM") + "</li>")
+                '        End If
+                '        ratingsHomeFile.WriteLine("<li><a class=""link_white"" href=""http://www.racenet.com.au/horse-racing-tips/ratings/"">" + onlineRatingsMeetingsReader("DisplayName").ToString.ToUpper + "</a></li>")
+                '    End While
+                'Else
+                '    ratingsHomeFile.WriteLine("")
+                'End If
+                'RacenetSql.closeReader(onlineRatingsMeetingsReader)
+                'RacenetSql.disposeCommand(onlineRatingsMeetingsCMD)
+                'ratingsHomeFile.Close()
+                'ratingsHomeFile.Dispose()
+                'ratingsHomeFile = Nothing
 
                 '####################################################################################
                 'Raceday Clean Up
@@ -301,29 +306,29 @@ Module Module1
                 racedayCleanup.ExecuteNonQuery()
                 RacenetSql.disposeCommand(racedayCleanup)
 
-                Dim racedayPath As String = rootPath + "/breeding/includes/homepage/racedaymeetings.txt"
-                Dim racedayFile As StreamWriter = File.CreateText(racedayPath)
+                'Dim racedayPath As String = rootPath + "/breeding/includes/homepage/racedaymeetings.txt"
+                'Dim racedayFile As StreamWriter = File.CreateText(racedayPath)
 
-                Dim racedayCurrentDate As String = ""
+                'Dim racedayCurrentDate As String = ""
 
-                Dim racedayMeetingsOnlineCMD As SqlCommand = RacenetSql.buildCommand("rn_RatingsTipsMeetingsOnline", conn)
-                Dim racedayMeetingsOnlineReader As SqlDataReader = racedayMeetingsOnlineCMD.ExecuteReader
-                If racedayMeetingsOnlineReader.HasRows Then
-                    While racedayMeetingsOnlineReader.Read
-                        If Not racedayCurrentDate = racedayMeetingsOnlineReader("mdate").ToString Then
-                            racedayCurrentDate = racedayMeetingsOnlineReader("mdate").ToString
-                            racedayFile.WriteLine("<li class=""prod_list_head"">" + Convert.ToDateTime(racedayCurrentDate).ToString("dddd") + " - " + Convert.ToDateTime(racedayCurrentDate).ToString("d") + " " + Convert.ToDateTime(racedayCurrentDate).ToString("MMMM") + "</li>")
-                        End If
-                        racedayFile.WriteLine("<li><a class=""link_white"" href=""http://www.racenet.com.au/horse-racing-tips/raceday/"">" + racedayMeetingsOnlineReader("Venue").ToString.ToUpper + "</a></li>")
-                    End While
-                Else
-                    racedayFile.WriteLine("<p>Next meetings available soon.</p>")
-                End If
-                RacenetSql.closeReader(racedayMeetingsOnlineReader)
-                RacenetSql.disposeCommand(racedayMeetingsOnlineCMD)
-                racedayFile.Close()
-                racedayFile.Dispose()
-                racedayFile = Nothing
+                'Dim racedayMeetingsOnlineCMD As SqlCommand = RacenetSql.buildCommand("rn_RatingsTipsMeetingsOnline", conn)
+                'Dim racedayMeetingsOnlineReader As SqlDataReader = racedayMeetingsOnlineCMD.ExecuteReader
+                'If racedayMeetingsOnlineReader.HasRows Then
+                '    While racedayMeetingsOnlineReader.Read
+                '        If Not racedayCurrentDate = racedayMeetingsOnlineReader("mdate").ToString Then
+                '            racedayCurrentDate = racedayMeetingsOnlineReader("mdate").ToString
+                '            racedayFile.WriteLine("<li class=""prod_list_head"">" + Convert.ToDateTime(racedayCurrentDate).ToString("dddd") + " - " + Convert.ToDateTime(racedayCurrentDate).ToString("d") + " " + Convert.ToDateTime(racedayCurrentDate).ToString("MMMM") + "</li>")
+                '        End If
+                '        racedayFile.WriteLine("<li><a class=""link_white"" href=""http://www.racenet.com.au/horse-racing-tips/raceday/"">" + racedayMeetingsOnlineReader("Venue").ToString.ToUpper + "</a></li>")
+                '    End While
+                'Else
+                '    racedayFile.WriteLine("<p>Next meetings available soon.</p>")
+                'End If
+                'RacenetSql.closeReader(racedayMeetingsOnlineReader)
+                'RacenetSql.disposeCommand(racedayMeetingsOnlineCMD)
+                'racedayFile.Close()
+                'racedayFile.Dispose()
+                'racedayFile = Nothing
 
                 '####################################################################################
                 'Gear changes Clean Up
@@ -384,10 +389,25 @@ Module Module1
                 RacenetSql.closeConnection(conn)
             End If
 
+            '####################################################################################
+            'Redis Rebuild
+            '####################################################################################
+            Dim buildAllHomepage As Homepage = New Homepage()
+            AsyncContext.Run(Function() buildAllHomepage.CreateHTML(New String() {"homepage"}, "all"))
+            Dim buildAllNews As News = New News()
+            AsyncContext.Run(Function() buildAllNews.CreateHTML(New String() {"news"}, "all"))
+            Dim buildFormPage As FormPageGenerator = New FormPageGenerator()
+            buildFormPage.Generate()
+            Dim buildHomepageForm As FormTabsGenerator = New FormTabsGenerator()
+            buildFormPage.Generate()
+
 
             '+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
             '+++++++++++++++++++++++++++++++ File Deletion +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
             '+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+            Dim credentials As Amazon.Runtime.AWSCredentials = New Amazon.Runtime.BasicAWSCredentials("AKIAJCLDXLGA37VCLMIQ", "H9Jm2gNXkF2LSkjlqL4aJ+On6tyGRxDU00lf+tgv")
+            Dim s3 As IAmazonS3 = New AmazonS3Client(credentials, Amazon.RegionEndpoint.APSoutheast2)
 
             '####################################################################################
             'Form Folders
@@ -425,6 +445,71 @@ Module Module1
             Next
             racebooksFiles = Nothing
 
+
+            Dim racebooksOnline As ListObjectsRequest = New ListObjectsRequest()
+            racebooksOnline.BucketName = "racenet"
+            racebooksOnline.Prefix = "racebooks"
+            Dim bookResponse As ListObjectsResponse = s3.ListObjects(racebooksOnline)
+            For Each bookObj As S3Object In bookResponse.S3Objects
+                Dim filename As String = bookObj.Key
+                If filename.Contains(textdate) Then
+                    Try
+                        Dim deleteRacebookFile As DeleteObjectRequest = New DeleteObjectRequest()
+                        deleteRacebookFile.BucketName = "racenet"
+                        deleteRacebookFile.Key = filename
+                        s3.DeleteObject(deleteRacebookFile)
+                    Catch ex As Exception
+
+                    End Try
+                End If
+
+                Try
+                    Dim racebookDateModified As Date = bookObj.LastModified
+                    If (Now - racebookDateModified).TotalDays > 7 Then
+                        Dim deleteRacebookFile As DeleteObjectRequest = New DeleteObjectRequest()
+                        deleteRacebookFile.BucketName = "racenet"
+                        deleteRacebookFile.Key = filename
+                        s3.DeleteObject(deleteRacebookFile)
+                    End If
+                Catch ex As Exception
+
+                End Try
+
+            Next
+
+            '####################################################################################
+            'Amazon File Clean Up
+            '####################################################################################
+
+            Dim amazonS3Files As ListObjectsRequest = New ListObjectsRequest()
+            amazonS3Files.BucketName = "racenet"
+            amazonS3Files.Prefix = "text-files"
+            Dim amazonS3FilesResponse As ListObjectsResponse = s3.ListObjects(amazonS3Files)
+            For Each s3Obj As S3Object In amazonS3FilesResponse.S3Objects
+                Dim filename As String = s3Obj.Key
+                If filename.Contains(textdate) Then
+                    Try
+                        Dim deleteS3File As DeleteObjectRequest = New DeleteObjectRequest()
+                        deleteS3File.BucketName = "racenet"
+                        deleteS3File.Key = filename
+                        s3.DeleteObject(deleteS3File)
+                    Catch ex As Exception
+
+                    End Try
+                End If
+                Try
+                    Dim s3DateModified As Date = s3Obj.LastModified
+                    If (Now - s3DateModified).TotalDays > 7 Then
+                        Dim deleteS3File As DeleteObjectRequest = New DeleteObjectRequest()
+                        deleteS3File.BucketName = "racenet"
+                        deleteS3File.Key = filename
+                        s3.DeleteObject(deleteS3File)
+                    End If
+                Catch ex As Exception
+
+                End Try
+
+            Next
             '####################################################################################
             'Gear Changes Folder
             '####################################################################################
